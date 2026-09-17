@@ -1,0 +1,1 @@
+FROM swr.cn-southwest-2.myhuaweicloud.com/muzili/redis:8.2.7

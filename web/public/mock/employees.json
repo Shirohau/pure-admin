@@ -1,0 +1,97 @@
+{
+    "code": "200",
+    "msg": "操作成功",
+    "total": 21,
+    "data": [
+        {
+            "id": "1",
+            "employeeName": "管理员",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "2",
+            "employeeName": "李二",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "3",
+            "employeeName": "王三",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "4",
+            "employeeName": "菜四",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "5",
+            "employeeName": "牛五",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "6",
+            "employeeName": "马六",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "7",
+            "employeeName": "刘七",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "8",
+            "employeeName": "刘八",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "9",
+            "employeeName": "刘九",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "10",
+            "employeeName": "刘十",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "11",
+            "employeeName": "刘十一",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "12",
+            "employeeName": "刘十二",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "13",
+            "employeeName": "刘十三",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "14",
+            "employeeName": "刘十四",
+            "isLeave": "0",
+            "open": "false"
+        },
+        {
+            "id": "15",
+            "employeeName": "刘十五",
+            "isLeave": "0",
+            "open": "false"
+        }
+    ]
+}

@@ -1,0 +1,28 @@
+FROM swr.cn-southwest-2.myhuaweicloud.com/muzili/python:3.11-slim
+
+# 设置关键环境变量
+# 1、告诉 Debian 系统的包管理器（如 apt）不要尝试与用户交互
+# 2、禁止 Python 自动生成 .pyc 字节码缓存文件
+# 3、强制 Python 输出（stdout/stderr）不缓冲，立即打印到终端或日志
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# 切换阿里云 apt 源（加速国内下载）
+RUN sed -i 's|http://deb.debian.org|https://mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources
+# === 系统依赖说明 ===
+# libmariadb-dev pkg-config gcc: mysqlclient 需要
+# curl: 网络调试工具 用于健康检查
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libmariadb-dev pkg-config gcc \
+        curl \
+        && rm -rf /var/lib/apt/lists/*
+
+
+WORKDIR /backend
+COPY ./backend/requirements.txt .
+
+# 使用阿里云 PyPI 镜像安装 Python 依赖
+RUN pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ && \
+    pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --no-cache-dir

@@ -1,0 +1,3 @@
+[submodule "docs"]
+	path = docs
+	url = git@gitee.com:Muzi-Li-Chine/vue-django-docker-docs.git

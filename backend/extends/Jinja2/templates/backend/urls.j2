@@ -1,0 +1,15 @@
+# 路由
+from django.urls import path, include
+from rest_framework import routers
+
+from .views import {{ model_prefix }}ViewSet, {{ model_prefix }}ExportJobViewSet, {{ model_prefix }}ImportJobViewSet
+
+router = routers.DefaultRouter()
+router.register(r"{{ model_prefix|lower }}/async_import", {{ model_prefix }}ImportJobViewSet)
+router.register(r"{{ model_prefix|lower }}/async_export", {{ model_prefix }}ExportJobViewSet)
+router.register(r"{{ model_prefix|lower }}", {{ model_prefix }}ViewSet)
+
+urlpatterns = [
+    path("", include(router.urls)),
+]
+

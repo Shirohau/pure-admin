@@ -1,0 +1,43 @@
+// 颜色选择器定制样式
+// el-select 下拉面板 teleport 到 body，scoped 样式不生效，
+// 故通过 popper-class 配合全局样式定制（类名以 dictionary-color 前缀避免污染）
+.dictionary-color-select {
+  // 下拉选项：flex 垂直居中 + 圆角 + hover 高亮
+  // （EP 默认 item 为块级 + line-height 居中，自定义内容需显式 flex 居中）
+  .el-select-dropdown__item {
+    display: flex;
+    align-items: center;
+    margin: 0 4px;
+    border-radius: 6px;
+    padding-left: 8px;
+    padding-right: 8px;
+
+    &.is-hovering {
+      background-color: var(--el-fill-color-light);
+    }
+  }
+
+  // 选中项的勾选图标
+  .dictionary-color-check {
+    color: var(--el-color-primary);
+    flex-shrink: 0;
+  }
+}
+
+// 颜色圆点（选中值前缀，随 el-select__prefix 垂直居中）
+.dictionary-color-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+// 选项内容布局：el-tag 靠左 + 勾选图标靠右
+.dictionary-color-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}

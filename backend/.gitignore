@@ -1,0 +1,26 @@
+.idea
+media
+static
+*.pyc
+logs
+
+# 忽略所有 migrations 目录下的 .py 文件，但保留 __init__.py
+**/migrations/*.py
+!**/migrations/__init__.py
+
+/.codeartsdoer/
+
+# 忽略Jinja2结果文件
+/Jinja2_result/
+/.venv/
+
+# 本地调试脚本（含阿里云密钥，禁止提交）
+/tests/发送短信.py
+
+# 移除邮箱配置文件
+/extends/email/settings.py
+# 移除OAuth2配置文件
+/extends/oauth2/config.py
+/extends/otp/config.py
+/apps/xft/models/roster/json/
+/conf/env_dev.py

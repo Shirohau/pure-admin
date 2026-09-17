@@ -1,0 +1,9 @@
+# 过滤器
+from extends.drf.filters import CustomFilter
+from .models import {{ model_prefix }}Model
+
+
+class {{ model_prefix }}Filter(CustomFilter):
+    class Meta(CustomFilter.Meta):
+        model = {{ model_prefix }}Model
+

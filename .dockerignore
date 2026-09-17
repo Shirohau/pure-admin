@@ -1,0 +1,15 @@
+/backend/.idea
+/backend/Jinja2_result
+/backend/logs
+/backend/media
+/backend/static
+/backend/tests
+
+/docs/.vitepress/cache
+/docs/.vitepress/dist
+/docs/node_modules
+
+/web/.husky
+/web/.vscode
+/web/node_modules
+

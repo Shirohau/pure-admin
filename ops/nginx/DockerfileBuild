@@ -1,0 +1,12 @@
+# ==============================
+# 构建 Nginx 镜像
+# ==============================
+FROM swr.cn-southwest-2.myhuaweicloud.com/muzili/nginx:stable-alpine3.23-perl AS final
+# 复制构建好的前端文件
+# PC 端 Web（admin.vuedj.com 桌面设备入口）
+COPY /web/dist /usr/share/nginx/html/web
+# 文档站点
+COPY /docs/docs/.vuepress/dist /usr/share/nginx/html/docs
+# 移动端 H5（admin.vuedj.com 移动设备入口，由 Nginx 根据 User-Agent 自动分流）
+COPY /mobile/dist/build/h5 /usr/share/nginx/html/mobile
+

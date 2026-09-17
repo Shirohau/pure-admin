@@ -1,0 +1,25 @@
+# 序列化器
+from extends.drf.serializers import CustomSerializer
+from .models import {{ model_prefix }}Model
+
+
+class {{ model_prefix }}Serializer(CustomSerializer):
+    """ 通用序列化器 """
+    class Meta:
+        model = {{ model_prefix }}Model
+        fields = "__all__"
+
+
+class {{ model_prefix }}CreateSerializer(CustomSerializer):
+    """ 创建序列化器 """
+    class Meta:
+        model = {{ model_prefix }}Model
+        fields = "__all__"
+
+
+class {{ model_prefix }}UpdateSerializer(CustomSerializer):
+    """ 更新序列化器 """
+    class Meta:
+        model = {{ model_prefix }}Model
+        fields = "__all__"
+

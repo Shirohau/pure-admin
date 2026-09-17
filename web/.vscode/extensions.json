@@ -1,0 +1,60 @@
+{
+  "recommendations": [
+    // vue 3 语言支持
+    "vue.volar",
+    // eslint 检测
+    "dbaeumer.vscode-eslint",
+    // Visual Studio Code 的官方 Stylelint 扩展
+    "stylelint.vscode-stylelint",
+    // 使用 Prettier 的代码格式化程序
+    "esbenp.prettier-vscode",
+    // 支持 dotenv 文件语法
+    "mikestead.dotenv",
+    // 源代码的拼写检查器
+    "bradlc.vscode-tailwindcss",
+    // iconify 图标插件
+    "antfu.iconify",
+    // i18n 插件
+    "Lokalise.i18n-ally",
+    // CSS 变量提示
+    "vunguyentuan.vscode-css-variables",
+    // 在 package.json 中显示 PNPM catalog 的版本
+    "antfu.pnpm-catalog-lens",
+    // 自动补全文件路径（如 import '@/components/...'），支持别名（@）和相对路径。
+    "christian-kohler.path-intellisense",
+    // 允许为代码中的特定文本（如 TODO、注释、关键字）自定义颜色，提升可读性。
+    "warmthsea.vscode-custom-code-color",
+    // 为文件和文件夹提供丰富的图标，提升项目结构的可视化识别度。
+    "vscode-icons-team.vscode-icons",
+    // 检查 Markdown 文件的语法和风格规范（如标题层级、空行、列表格式），确保文档质量。
+    "davidanson.vscode-markdownlint",
+    // Red Hat 提供的 YAML 语言支持，支持语法高亮、自动补全、验证（如 Kubernetes、CI/CD 配置文件）。
+    "redhat.vscode-yaml",
+    // 为 PostCSS 提供语法支持，包括 @tailwind、@apply 等指令的高亮和补全。
+    "csstools.postcss",
+    // 增强 VS Code 的 Git 功能，显示代码行的作者、提交信息、变更历史，支持 blame、history 查看等。
+    "eamodio.gitlens",
+    // 在代码中直接显示错误信息
+    "usernamehw.errorlens",
+    // VS Code简体中文语言包
+    "ms-ceintl.vscode-language-pack-zh-hans",
+    // 查看和管理扩展版本
+    "pflannery.vscode-versionlens",
+    // 自动补全标签
+    "formulahendry.auto-rename-tag",
+    //  实时服务器预览
+    "ritwickdey.liveserver",
+    // 高亮TODO
+    "wayou.vscode-todo-highlight",
+    // 显示TODO
+    "gruntfuggly.todo-tree",
+    // Vue 3 代码片段
+    "sdras.vue-vscode-snippets",
+    // VitePress代码片段
+    "zhoucheng0431.vitepress-snippets"
+  ],
+  "unwantedRecommendations": [
+    // 和 volar 冲突
+    "octref.vetur"
+  ]
+}

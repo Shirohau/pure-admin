@@ -1,0 +1,80 @@
+# 核心包
+Django~=5.2.13
+# drf
+djangorestframework~=3.17.1
+# 增强 DRF 筛选功能
+django-filter~=25.2
+# 增强 DRF 序列化字段
+django-restql~=0.18.0
+# drf_jwt认证
+djangorestframework_simplejwt~=5.5.1
+# OA SDK 身份令牌 RS256 验签
+PyJWT[crypto]>=2.10.1,<3
+# drf_API key 认证
+djangorestframework-api-key~=3.1.0
+# cors跨域
+django-cors-headers~=4.9.0
+# Swagger文档
+drf-spectacular~=0.29.0
+drf-spectacular-sidecar~=2026.6.1
+# 历史记录
+django-simple-history~=3.11.0
+# 性能优化
+django-silk~=5.5.0
+django-debug-toolbar~=6.3.0
+# mysql 数据库
+mysqlclient~=2.2.4
+# redis
+redis~=8.0.0
+django-redis~=7.0.0
+pytz~=2026.2
+# 异步任务
+kombu~=5.6.2
+celery~=5.6.3
+django-celery-beat~=2.9.0
+django_celery_results~=2.6.0
+# 监听 celery
+flower~=2.0.1
+# 导入导出
+django-import-export~=4.4.1
+# 异步导入导出
+django-import-export-extensions~=1.10.2
+# 表格数据处理
+tablib~=3.9.0
+# 模板加载器
+Jinja2~=3.1.6
+# 线上部署
+uvicorn~=0.49.0
+starlette~=1.3.1
+# 网络请求
+requests~=2.34.2
+# 第三方登录（支付宝 RSA2 签名）
+pycryptodome~=3.21.0
+# Django 邮件调试服务器
+aiosmtpd~=1.4.6
+# websocket
+channels~=4.3.2
+channels_redis~=4.3.0
+# 图像处理
+pillow~=12.2.0
+# 树形结构管理库
+django-treebeard~=5.2.2
+# 拼音
+pypinyin~=0.55.0
+# 解析请求头User-Agent
+ua-parser~=1.0.1
+# 数据库工具包
+sqlalchemy~=2.0.49
+# Oracle 官方提供的 Python 数据库驱动
+oracledb~=4.0.1
+# 数据处理与分析
+pandas~=3.0.3
+# Excel 处理
+openpyxl~=3.1.5
+# 阿里云短信
+alibabacloud_dysmsapi20170525~=4.5.1
+# 薪福通API接口
+xftOpenApi~=1.0.0
+
+
+

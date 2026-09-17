@@ -1,0 +1,48 @@
+from import_export.fields import Field
+from extends.drf.resources import CustomCeleryResource
+from .filters import {{ model_prefix }}Filter
+from .models import {{ model_prefix }}Model
+
+
+class {{ model_prefix }}Resource(CustomCeleryResource):
+    """ 导出/导入资源类 """
+    filterset_class = {{ model_prefix }}Filter
+
+    standard_attribute_001 = Field(attribute="standard_attribute_001", column_name="属性名称")
+    standard_attribute_002 = Field(attribute="standard_attribute_002", column_name="值类型")
+    standard_attribute_003 = Field(attribute="standard_attribute_003", column_name="单位")
+    standard_attribute_999 = Field(attribute="standard_attribute_999", column_name="备注")
+
+    # 导入模板列宽配置（xlsx 格式生效）
+    import_column_widths = {
+        "属性名称": 20,
+        "值类型": 20,
+        "单位": 20,
+        "备注": 30
+    }
+
+    # 导入模板示例数据（下载模板时包含示例行）
+    examples_data = [
+        {"属性名称": "厚度", "值类型": "数值", "单位": "mm", "备注": ""},
+        {"属性名称": "高度", "值类型": "数值", "单位": "mm", "备注": ""},
+        {"属性名称": "尺寸", "值类型": "文本", "单位": "", "备注": ""},
+    ]
+
+    class Meta:
+        model = {{ model_prefix }}Model
+        # 导出字段
+        fields = (
+            "standard_attribute_001",
+            "standard_attribute_002",
+            "standard_attribute_003",
+            "standard_attribute_999"
+        )
+        # 导入时主键字段
+        import_id_fields = ["standard_attribute_001"]
+        # 批量操作
+        use_bulk = False
+        # 批量操作时每批次数量
+        batch_size = 100
+        # 导入时跳过未改变的行
+        skip_unchanged = True
+

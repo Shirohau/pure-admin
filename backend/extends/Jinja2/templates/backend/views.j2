@@ -1,0 +1,33 @@
+# 视图
+from drf_spectacular.utils import extend_schema
+
+from extends.drf.views_mixins import *
+
+from .filters import {{ model_prefix }}Filter
+from .models import {{ model_prefix }}Model
+from .resources import {{ model_prefix }}Resource
+from .serializers import {{ model_prefix }}Serializer, {{ model_prefix }}CreateSerializer, {{ model_prefix }}UpdateSerializer
+
+
+@extend_schema(tags=["{{ model_verbose_name }}"])
+class {{ model_prefix }}ViewSet(CrudViewSet, ImportMixin, ExportMixin, BatchDestroyMixin):
+    queryset = {{ model_prefix }}Model.objects.all()
+    serializer_class = {{ model_prefix }}Serializer
+    create_serializer_class = {{ model_prefix }}CreateSerializer
+    update_serializer_class = {{ model_prefix }}UpdateSerializer
+    filterset_class = {{ model_prefix }}Filter
+    export_resource_class = {{ model_prefix }}Resource
+    import_resource_class = {{ model_prefix }}Resource
+    search_fields = ["name",]
+
+
+
+@extend_schema(tags=["{{ model_verbose_name }}"])
+class {{ model_prefix }}ExportJobViewSet(CustomExportJobViewSet):
+    resource_class = {{ model_prefix }}Resource
+
+
+@extend_schema(tags=["{{ model_verbose_name }}"])
+class {{ model_prefix }}ImportJobViewSet(CustomImportJobViewSet):
+    resource_class = {{ model_prefix }}Resource
+

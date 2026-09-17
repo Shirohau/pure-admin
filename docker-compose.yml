@@ -1,0 +1,166 @@
+services:
+  mysql:
+    container_name: vdd-mysql
+    image: vdd-mysql
+    build:
+      context: .
+      dockerfile: ./ops/mysql/Dockerfile
+    restart: always
+    ports:
+      - "3308:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      TZ: Asia/Shanghai
+    command:
+      --wait_timeout=31536000
+      --interactive_timeout=31536000
+      --max_connections=1000
+      --default-authentication-plugin=caching_sha2_password
+    volumes:
+      - "./ops/mysql/data:/var/lib/mysql"
+      - "./ops/mysql/conf.d:/etc/mysql/conf.d"
+      - "./ops/mysql/logs:/logs"
+    healthcheck: # 检查健康状态
+      test: /bin/sh -c 'mysqladmin ping -h 127.0.0.1 -P 3306 -uroot -p"$${MYSQL_ROOT_PASSWORD}" >/dev/null 2>&1'
+      timeout: 5s # 单次检查最多等多久
+      retries: 5  # 连续失败多少次才算“不健康”
+      interval: 10s # 每隔多久检查一次
+      start_period: 10s # 容器启动后，先等待多久再开始第一次检查
+
+  redis:
+    container_name: vdd-redis # 容器名称
+    image: vdd-redis
+    build:
+      context: .
+      dockerfile: ./ops/redis/Dockerfile
+    restart: always
+    environment:
+      - TZ=Asia/Shanghai # 设置时区
+    volumes: # 配置数据卷
+      - ./ops/redis/data:/data
+      - ./ops/redis/redis.conf:/etc/redis/redis.conf
+    ports: # "主机端口:容器端口"
+      - "6379:6379"
+    sysctls: # 设置容器中的内核参数
+      - net.core.somaxconn=1024
+    # 指定配置文件并开启持久化
+    command: >
+      /bin/sh -c "
+        echo 'vm.overcommit_memory = 1' >> /etc/sysctl.conf && 
+        redis-server /etc/redis/redis.conf --requirepass ${REDIS_PASSWORD}
+      "
+    privileged: true # 使用该参数，container内的root拥有真正的root权限。否则，container内的root只是外部的一个普通用户权限
+
+  django:
+    container_name: vdd-django
+    image: vdd-django
+    build:
+      context: .
+      dockerfile: ./ops/django/Dockerfile
+    working_dir: /backend
+    depends_on:
+      mysql: # mysql 服务健康检查成功后才启动 django
+        condition: service_healthy
+    # 增加健康检查点，否则 nginx 会因为没有启动而访问失败
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health/" ]
+      timeout: 5s # 单次检查超时时间
+      retries: 5  # 连续失败多少次才算“不健康”
+      interval: 30s # 每隔多久检查一次
+      start_period: 10s # 容器启动后，先等待多久再开始第一次检查
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+      - ENVIRONMENT=prod
+      - SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
+      - USE_X_FORWARDED_HOST=1
+      # 数据库连接 —— 使用服务名！
+      - DATABASE_HOST=mysql
+      - MYSQL_DATABASE
+      - MYSQL_PASSWORD
+      # Redis连接
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD
+      # 公网IP
+      - PUBLIC_IP
+      - ADMIN_URL
+      # Django 签名密钥（生产必需）
+      - DJANGO_SECRET_KEY
+    volumes:
+      - ./backend:/backend
+      - ./backend/logs:/var/logs
+    expose:
+      - "8000"
+    restart: always
+
+  celery:
+    container_name: vdd-celery
+    image: vdd-celery
+    build:
+      context: .
+      dockerfile: ./ops/celery/Dockerfile
+    working_dir: /backend
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      - PYTHONUNBUFFERED=1
+      - TZ=Asia/Shanghai
+      - ENVIRONMENT=prod
+      - SECURE_PROXY_SSL_HEADER=HTTP_X_FORWARDED_PROTO,https
+      - USE_X_FORWARDED_HOST=1
+      # 数据库连接 —— 使用服务名！
+      - DATABASE_HOST=mysql
+      - MYSQL_DATABASE
+      - MYSQL_PASSWORD
+      # Redis连接
+      - REDIS_HOST=redis
+      - REDIS_PASSWORD
+      # 公网IP
+      - PUBLIC_IP
+      - ADMIN_URL
+      # Django 签名密钥（生产必需）
+      - DJANGO_SECRET_KEY
+    volumes:
+      - ./backend:/backend
+      - ./backend/logs:/var/logs
+    restart: always
+
+
+  nginx:
+    container_name: vdd-nginx
+    # 说明：web / docs / mobile 静态构建产物已由 build_nginx.sh 打包进 vdd-base-nginx 基础镜像
+    #      （mobile 部署于 /usr/share/nginx/html/mobile，Nginx 按 User-Agent 自动分流 PC/移动端）
+    image: vdd-nginx
+    build:
+      context: .
+      dockerfile: ./ops/nginx/Dockerfile
+    ports:
+      - "80:80"
+      - "443:443"
+#      - "5173:5173"
+#      - "8080:8080"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+#      - ./ops/nginx/conf.d:/etc/nginx/conf.d # 挂载配置文件 用端口
+#      - ./ops/nginx/conf.http:/etc/nginx/conf.d # 挂载配置文件 用http（含移动端 UA 分流配置）
+      - ./ops/nginx/conf.https:/etc/nginx/conf.d # 挂载配置文件 用https（含移动端 UA 分流配置）
+      - ./ops/nginx/ssl:/etc/nginx/ssl # 挂载 ssl 证书
+      - ./ops/nginx/logs:/var/log/nginx  # 挂载日志目录
+      - ./backend/media:/usr/share/nginx/html/media # 挂载 media
+    restart: always
+    # 👇 新增 depends_on，等待 django 健康
+    depends_on:
+      django:
+        condition: service_healthy
+    networks:
+      - default        # 原有内部网络（用于 django/mysql）
+      - shared-net     # 加入外部共享网络
+
+networks:
+  default:
+    driver: bridge
+  shared-net:
+    external: true   # ← 引用外部共享网络
