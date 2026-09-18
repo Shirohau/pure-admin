@@ -50,7 +50,7 @@ docker build -f ops/django/DockerfileBuild -t swr.cn-southwest-2.myhuaweicloud.c
 docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build
 ```
 
-额外 Compose 文件给 Django 与 Celery 传入免登变量，同时为 Nginx 挂载免登所需的代理配置。原端口、Web 配置目录、数据库、Redis、证书和业务服务配置继续沿用主 Compose。原项目本身所需的 `.env`、本地配置模块、数据库初始化、证书和外部网络仍按其原部署方式准备。
+额外 Compose 文件只给 Django 与 Celery 传入免登变量，未修改原端口、数据库、Redis、证书和业务服务配置。原项目本身所需的 `.env`、本地配置模块、数据库初始化、证书和外部网络仍按其原部署方式准备。
 
 本次自动建号复用已有用户表、第三方身份表及其唯一约束，没有修改数据库结构。更新本次后台源码后，需要重建 Django/Celery 镜像使新逻辑生效；仅重启旧容器不能更新镜像中的代码。在外接应用项目根目录执行：
 
@@ -63,35 +63,6 @@ docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build 
 前端继续使用原 `VITE_API_URL`。生产配置为 `/api`，原 Nginx 会去掉一层 `/api`，因此浏览器访问 `/api/api/oa-sso/prepare/`，Django 实际收到 `/api/oa-sso/prepare/`，与原 `/api/token/` 接口的路径规则一致。开发环境须让前端及认证接口也经过同源 HTTPS 代理；当前开发配置的跨源 `http://127.0.0.1:8000` 不适合使用 Secure Cookie 完成免登。
 
 如使用本机 OA 联调地址，注意容器内的 `localhost` 指向容器自身。需要让同一个 OA issuer 在浏览器与容器内都可解析、可连接且通过证书校验；不要把关闭证书验证当作解决方法。具体域名和证书取决于最终选择的应用地址。
-
-### HTTPS 与页面来源报错
-
-认证接口分别检查后台收到的原始访问协议及浏览器的 `Origin`。旧版本将两种失败都提示为“请从应用自己的 HTTPS 页面发起登录”；新版本分别提示，登录准备、兑换和退出接口共用同一检查。
-
-- “应用后台未识别到 HTTPS”：检查外接应用自己的整条代理链。Django 已设置 `SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')`，需要紧邻 Django 的代理正确传递原始协议。如果浏览器 HTTPS 在上游终止，再通过 HTTP 到本应用 Nginx，旧配置 `proxy_set_header X-Forwarded-Proto $scheme` 会把原始协议覆盖为 `http`。修改 ECP 网关不会自动修改外接应用的代理。
-- “登录页面来源与 OA_APP_ORIGIN 不一致”：确认容器中的 `OA_APP_ORIGIN` 等于浏览器实际来源，例如 `https://oa-sdktest.rekeymed.com`，不包含 `/welcome` 等路径。代理应保留浏览器的 `Origin`，不要改成 ECP 平台地址，也不要由代理伪造该头。修改 `.env.oa-sso` 后需使用额外 Compose 文件重新创建 Django/Celery 容器。
-
-只核对应用来源、转发协议和实际代理配置即可，不需要重新生成 Client ID、Client Secret 或签名私钥。
-
-本应用的三套 Web Nginx 配置（`conf.d`、`conf.http`、`conf.https`）统一引用 `ops/nginx/oa-proxy/forwarded-proto.conf`，仅对 `trusted-proxies.conf` 中的直接上游接受准确的 `https` 或 `http` 转发头，其他情况按实际连接协议处理。当前测试部署已确认上游是 `192.168.1.2`，因此名单中配置 `192.168.1.2/32 1;`；其他部署需要替换为自己的代理 IP，直接使用本应用 HTTPS 则可清空名单。不要将整个内网或所有地址设为可信代理。
-
-上游负责 `oa-sdktest.rekeymed.com` 的 HTTPS 入口仍需覆盖设置 `proxy_set_header X-Forwarded-Proto $scheme;`，不能原样透传浏览器提供的值。内层 Nginx 到 Django 使用 `$oa_forwarded_proto`。同时保留原始 `Host` 和浏览器 `Origin`。
-
-`docker-compose.oa-sso.yml` 已包含 `./ops/nginx/oa-proxy:/etc/nginx/oa-proxy:ro` 挂载；服务器可继续使用自己定制的主 Compose，只需叠加此文件，无需手动向主文件补挂载。主 Compose 已有相同挂载时，Compose 按容器挂载目标合并。首次应用此修复必须重新创建 Nginx 容器，单独 reload 不会添加挂载。同步代码并保留服务器自己的域名、证书及原有配置后，在项目根目录执行（有其他部署覆盖文件时一并沿用）：
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build --no-deps --force-recreate nginx django celery
-```
-
-此项改动不改变数据库结构，也无需重新构建前端静态资源。
-
-如果后台代码已经更新，此次只是补齐 Nginx 挂载（如服务器将 `23767:80` 映射到 `conf.http`），更新额外 Compose 文件后只需重新创建 Nginx，不需要构建镜像或重启其他服务：
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --no-deps --force-recreate nginx
-```
-
-若出现 `open() "/etc/nginx/oa-proxy/forwarded-proto.conf" failed`，说明配置挂载未生效或宿主机缺少对应文件；不是身份校验失败。确认源码中的 `ops/nginx/oa-proxy` 已同步，并使用包含该挂载的额外 Compose 文件重新创建容器。
 
 应用首页请求会携带一次性 `oa_ticket`。部署代理应对携带该参数的请求关闭访问日志，并设置 `Referrer-Policy: no-referrer`；认证接口不记录请求体和授权头。原 Nginx 日志配置未在本次接入中整体调整，需在实际测试来源对应的代理处落实。
 
