@@ -72,7 +72,7 @@ def prepare(request, values):
     challenge = urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
     started = time.time()
     prepared = sso.platform_request('/sso/v1/desktop/auth-requests/', json_body={
-        'redirect_uri': cfg['OA_REDIRECT_URI'], 'scope': 'openid tenant',
+        'redirect_uri': cfg['OA_REDIRECT_URI'], 'scope': 'openid tenant profile',
         'code_challenge': challenge, 'code_challenge_method': 'S256', 'nonce': nonce,
     })
     ttl = int(min(float(prepared['expires_in']), 300) - (time.time() - started))
@@ -105,9 +105,9 @@ def complete(request, values):
         if not isinstance(access_token, str) or not access_token:
             raise sso.SsoError('OA 访问令牌无效', 401)
         identity = sso.verify_identity(tokens['id_token'], pending['nonce'])
-        sso.context(access_token, identity)
-        user = sso.mapped_user(identity)
+        profile_data = sso.context(access_token, identity)
         end = sso.deadline(tokens, started)
+        user = sso.mapped_user(identity, create=True, profile_data=profile_data)
         session_id = secrets.token_urlsafe(32)
         stored = {'identity': {k: identity[k] for k in ('sub', 'tenant_id', 'member_uid', 'sid')},
                   'access_token': access_token, 'user_id': user.pk, 'deadline': end}
@@ -120,7 +120,7 @@ def complete(request, values):
             session_id, sso.seal(stored), max(1, int(end - time.time())))
         if not created:
             raise sso.SsoError('登录已取消，请从工作台重新打开', 409)
-        # 复用原账号、角色及原登录响应格式；只增加本次 OA 授权会话关联。
+        # 复用已关联账号及其本地权限；首次创建不分配角色，保留原登录响应格式。
         refresh = RefreshToken.for_user(user)
         refresh['oa_sso'] = session_id
         refresh['exp'] = min(refresh['exp'], end)

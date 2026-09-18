@@ -1,4 +1,4 @@
-"""只处理 OA 登录；平台长期凭据保留在后台，业务身份使用显式映射。"""
+"""只处理 OA 登录；平台长期凭据保留在后台，验证身份后自动创建普通账号。"""
 import base64
 import hashlib
 import json
@@ -14,7 +14,11 @@ import jwt
 import requests
 from Crypto.Cipher import AES
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django_redis import get_redis_connection
+
+from extends.oauth2.models import UserOAuthModel
+from .constants import OA_BINDING_PLATFORM
 
 
 class SsoError(Exception):
@@ -33,7 +37,7 @@ def config():
         raise SsoError('OA 免登尚未配置', 503)
     values = {name: os.getenv(name, '').strip() for name in (
         'OA_ISSUER', 'OA_CLIENT_ID', 'OA_CLIENT_SECRET', 'OA_REDIRECT_URI',
-        'OA_APP_ORIGIN', 'OA_STORE_ENCRYPTION_KEY', 'OA_ACCOUNT_BINDINGS',
+        'OA_APP_ORIGIN', 'OA_STORE_ENCRYPTION_KEY',
     )}
     try:
         for name in ('OA_ISSUER', 'OA_APP_ORIGIN', 'OA_REDIRECT_URI'):
@@ -50,20 +54,6 @@ def config():
             raise ValueError()
         if not re.fullmatch(r'[0-9a-fA-F]{64}', values['OA_STORE_ENCRYPTION_KEY']):
             raise ValueError()
-        bindings = json.loads(values['OA_ACCOUNT_BINDINGS'])
-        if not isinstance(bindings, list) or not bindings:
-            raise ValueError()
-        identities = set()
-        for binding in bindings:
-            if not isinstance(binding, dict) or set(binding) != {'tenant_id', 'sub', 'username'}:
-                raise ValueError()
-            if any(not isinstance(v, str) or not v for v in binding.values()):
-                raise ValueError()
-            identity = (binding['tenant_id'], binding['sub'])
-            if identity in identities:
-                raise ValueError()
-            identities.add(identity)
-        values['bindings'] = bindings
         values['key'] = bytes.fromhex(values['OA_STORE_ENCRYPTION_KEY'])
     except (ValueError, TypeError, KeyError):
         raise SsoError('OA 免登配置不完整，请联系应用管理员', 503) from None
@@ -175,12 +165,44 @@ def context(access_token, identity):
     return result
 
 
-def mapped_user(identity):
-    matches = [item for item in config()['bindings'] if item['tenant_id'] == identity['tenant_id']
-               and item['sub'] == identity['sub']]
-    if len(matches) != 1:
-        raise SsoError('该 OA 员工尚未关联本应用账号，请联系管理员', 403)
-    user = get_user_model().objects.filter(username=matches[0]['username'], is_active=True).first()
+def mapped_user(identity, *, create=False, profile_data=None):
+    """仅首次成功兑换允许创建；业务请求与刷新令牌只读取已有身份关联。"""
+    subject = {'issuer': config()['OA_ISSUER'], 'tenant_id': identity.get('tenant_id'),
+               'sub': identity.get('sub')}
+    if any(not isinstance(value, str) or not value for value in subject.values()):
+        raise SsoError('OA 身份信息不完整', 401)
+    uid = hashlib.sha256(json.dumps(subject, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    query = UserOAuthModel.objects.filter(platform=OA_BINDING_PLATFORM, uid=uid)
+    binding = query.first()
+    if binding is None and create:
+        # 姓名和用户名只用于显示；不按邮箱、手机号或同名账号自动合并身份。
+        profile_data = profile_data or {}
+        name = next((value.strip() for value in (
+            profile_data.get('name'), profile_data.get('preferred_username')
+        ) if isinstance(value, str) and value.strip()), 'ECP 员工 ' + uid[:8])[:40]
+        try:
+            with transaction.atomic():
+                user = get_user_model()(
+                    username='oa_' + secrets.token_hex(24), name=name,
+                    is_active=True, is_staff=False, is_superuser=False,
+                    email=None, mobile=None,
+                )
+                user.set_unusable_password()
+                user.save(force_insert=True)
+                # 表已有 (platform, uid) 唯一约束。并发重复创建失败时同时回滚新用户。
+                binding = UserOAuthModel.objects.create(
+                    user=user, platform=OA_BINDING_PLATFORM, uid=uid,
+                    uname=name, uinfo={'identity': subject},
+                )
+        except IntegrityError:
+            binding = query.first()
+            if binding is None:
+                raise
+    if binding is None:
+        raise SsoError('OA 账号关联已失效，请从工作台重新打开', 401)
+    if not isinstance(binding.uinfo, dict) or binding.uinfo.get('identity') != subject:
+        raise SsoError('OA 账号关联身份不一致', 401)
+    user = get_user_model().objects.filter(pk=binding.user_id, is_active=True).first()
     if user is None:
         raise SsoError('关联的本应用账号不存在或已停用', 403)
     return user

@@ -19,6 +19,7 @@ from .models import UserOAuthModel
 from .serializers import UserOAuthSerializer
 from .service import OAuthService
 from .config import get_platform_config
+from extends.oa_sso.constants import OA_BINDING_PLATFORM
 
 User = get_user_model()
 
@@ -26,7 +27,8 @@ User = get_user_model()
 @extend_schema(tags=["第三方账号"])
 class UserOAuthView(CrudViewSet):
     """OAuth2 第三方登录管理视图"""
-    queryset = UserOAuthModel.objects.all()
+    # SDK 自动维护的身份关联不允许通过通用第三方账号接口重新绑定或删除。
+    queryset = UserOAuthModel.objects.exclude(platform=OA_BINDING_PLATFORM)
     serializer_class = UserOAuthSerializer
     filterset_class = UserOAuthFilter
     select_related = ['user']  # 默认需要关联的外键表
@@ -56,6 +58,9 @@ class UserOAuthView(CrudViewSet):
         platform = request.query_params.get('platform')
         kind = request.query_params.get('kind')
 
+        if platform == OA_BINDING_PLATFORM:
+            return error_response(message="ECP 免登请从工作台打开应用")
+
         if not platform or not kind:
             return error_response(message="缺少必要参数: platform, kind")
 
@@ -78,6 +83,8 @@ class UserOAuthView(CrudViewSet):
         - code: 授权码
         - user_id: 当前用户ID（仅 binding 时需要）
         """
+        if request.data.get('platform') == OA_BINDING_PLATFORM:
+            return error_response(message="ECP 身份仅通过 SDK 免登验证，不支持手动绑定")
         # 交由服务层处理
         try:
             service = OAuthService(request)
