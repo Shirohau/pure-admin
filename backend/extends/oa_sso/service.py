@@ -1,6 +1,7 @@
 """只处理 OA 登录；平台长期凭据保留在后台，验证身份后自动创建普通账号。"""
 import base64
 import hashlib
+import hmac
 import json
 import math
 import os
@@ -39,7 +40,11 @@ def config():
         'OA_ISSUER', 'OA_CLIENT_ID', 'OA_CLIENT_SECRET', 'OA_REDIRECT_URI',
         'OA_APP_ORIGIN', 'OA_STORE_ENCRYPTION_KEY',
     )}
+    values['test_mode'] = os.getenv('OA_SSO_TEST_MODE', '0') == '1'
     try:
+        if values['test_mode'] and not values['OA_APP_ORIGIN']:
+            redirect = urlsplit(values['OA_REDIRECT_URI'])
+            values['OA_APP_ORIGIN'] = f'{redirect.scheme}://{redirect.netloc}'
         for name in ('OA_ISSUER', 'OA_APP_ORIGIN', 'OA_REDIRECT_URI'):
             value = urlsplit(values[name])
             if value.scheme != 'https' or not value.netloc or value.username or value.password or value.fragment:
@@ -52,9 +57,18 @@ def config():
             raise ValueError()
         if not values['OA_CLIENT_ID'] or not values['OA_CLIENT_SECRET']:
             raise ValueError()
-        if not re.fullmatch(r'[0-9a-fA-F]{64}', values['OA_STORE_ENCRYPTION_KEY']):
-            raise ValueError()
-        values['key'] = bytes.fromhex(values['OA_STORE_ENCRYPTION_KEY'])
+        if values['test_mode'] and not values['OA_STORE_ENCRYPTION_KEY']:
+            # 测试部署复用稳定的 Django 密钥，但为此应用单独派生加密用途的密钥。
+            # 已有显式配置始终优先，避免使此前保存的会话无法解密。
+            secret = os.getenv('DJANGO_SECRET_KEY', '')
+            if not secret:
+                raise ValueError()
+            purpose = 'vdd:oa-sso:test-storage:v1\n' + values['OA_ISSUER'] + '\n' + values['OA_CLIENT_ID']
+            values['key'] = hmac.new(secret.encode(), purpose.encode(), hashlib.sha256).digest()
+        else:
+            if not re.fullmatch(r'[0-9a-fA-F]{64}', values['OA_STORE_ENCRYPTION_KEY']):
+                raise ValueError()
+            values['key'] = bytes.fromhex(values['OA_STORE_ENCRYPTION_KEY'])
     except (ValueError, TypeError, KeyError):
         raise SsoError('OA 免登配置不完整，请联系应用管理员', 503) from None
     return values

@@ -38,8 +38,12 @@ def endpoint(view):
             cfg = sso.config()
             if request.method != 'POST':
                 raise sso.SsoError('仅支持 POST 请求', 405)
-            if not request.is_secure() or request.headers.get('Origin') != cfg['OA_APP_ORIGIN']:
-                raise sso.SsoError('请从应用自己的 HTTPS 页面发起登录', 403)
+            # 测试模式仅跳过 Django 对代理传入协议的判断，不改变全局代理信任设置。
+            # 浏览器仍须从配置的 HTTPS 来源访问，事务与会话仍使用 Secure Cookie。
+            if not cfg['test_mode'] and not request.is_secure():
+                raise sso.SsoError('应用后台未识别到 HTTPS，请检查代理配置；测试环境可启用 OA_SSO_TEST_MODE', 403)
+            if request.headers.get('Origin') != cfg['OA_APP_ORIGIN']:
+                raise sso.SsoError('登录页面来源与 OA_APP_ORIGIN 不一致，请从配置的应用域名打开', 403)
             if request.content_type != 'application/json' or len(request.body) > 16384:
                 raise sso.SsoError('请求格式无效')
             values = json.loads(request.body)
@@ -72,7 +76,8 @@ def prepare(request, values):
     challenge = urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b'=').decode()
     started = time.time()
     prepared = sso.platform_request('/sso/v1/desktop/auth-requests/', json_body={
-        'redirect_uri': cfg['OA_REDIRECT_URI'], 'scope': 'openid tenant profile',
+        'redirect_uri': cfg['OA_REDIRECT_URI'],
+        'scope': 'openid tenant' if cfg['test_mode'] else 'openid tenant profile',
         'code_challenge': challenge, 'code_challenge_method': 'S256', 'nonce': nonce,
     })
     ttl = int(min(float(prepared['expires_in']), 300) - (time.time() - started))
