@@ -41,6 +41,8 @@ OA_REDIRECT_URI=https://oa-sdktest.rekeymed.com/welcome
 docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build --no-deps --force-recreate django celery
 ```
 
+后台启动成功后，还需要按下文“后台重建后出现 502”中的步骤重新加载 Nginx，使其连接重建后的后台容器。
+
 ### 配置说明
 
 | 配置 | 填写方式 |
@@ -82,13 +84,31 @@ docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build
 
 额外 Compose 文件只给 Django 与 Celery 传入免登变量，未修改原端口、数据库、Redis、证书和业务服务配置。原项目本身所需的 `.env`、本地配置模块、数据库初始化、证书和外部网络仍按其原部署方式准备。
 
-本次自动建号复用已有用户表、第三方身份表及其唯一约束，没有修改数据库结构。更新本次后台源码后，需要重建 Django/Celery 镜像使新逻辑生效；仅重启旧容器不能更新镜像中的代码。在外接应用项目根目录执行：
+本次自动建号复用已有用户表、第三方身份表及其唯一约束，没有修改数据库结构。更新本次后台源码后，镜像内置源码的部署需要重建 Django/Celery 镜像；若已将 `./backend:/backend` 挂载到容器，则使用宿主机源码，但更新依赖仍需构建镜像。在外接应用项目根目录执行：
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build --no-deps --force-recreate django celery
 ```
 
 `.env.oa-sso` 中保留 `OA_SSO_ENABLED=1`、平台地址、应用凭证、应用来源、完整回调地址和存储加密密钥，删除 `OA_ACCOUNT_BINDINGS` 即可。不要把实际 Client Secret 或加密密钥写入源码及文档。
+
+### 后台重建后出现 502
+
+现有 Nginx 使用 `proxy_pass http://django:8000/`，启动或重新加载配置时解析后台服务地址。重建 Django 容器后，其内部 IP 可能变化；仍在运行的 Nginx 可能继续连接旧 IP，此时即使 Django 已经正常启动也会返回 `502 Bad Gateway`。这与 `OA_SSO_TEST_MODE` 是否开启是不同问题。
+
+每次重建后台后，先确认容器内健康接口成功：
+
+```bash
+docker exec vdd-django curl -fsS http://localhost:8000/health/
+```
+
+成功后重新加载 Nginx，让它取得新的后台地址，无需修改 Nginx 配置或重新构建前端：
+
+```bash
+docker exec vdd-nginx nginx -s reload
+```
+
+如果健康接口失败，先检查 `docker logs --tail 80 vdd-django`；如果健康接口成功但重新加载后仍有 502，检查 Nginx 的 `/var/log/nginx/error.proxy.log`，核对其中实际连接的后台地址及连接错误。Nginx 配置引用文件缺失等启动错误也需单独处理，不能仅凭 502 判断根因。
 
 前端继续使用原 `VITE_API_URL`。生产配置为 `/api`，原 Nginx 会去掉一层 `/api`，因此浏览器访问 `/api/api/oa-sso/prepare/`，Django 实际收到 `/api/oa-sso/prepare/`，与原 `/api/token/` 接口的路径规则一致。开发环境须让前端及认证接口也经过同源 HTTPS 代理；当前开发配置的跨源 `http://127.0.0.1:8000` 不适合使用 Secure Cookie 完成免登。
 
