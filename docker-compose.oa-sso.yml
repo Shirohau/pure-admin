@@ -1,5 +1,8 @@
 # 在原 Compose 之外显式叠加，不改变原端口、数据库、Redis 或业务服务配置。
 services:
+  nginx:
+    volumes:
+      - ./ops/nginx/oa-proxy:/etc/nginx/oa-proxy:ro
   django:
     env_file:
       - .env.oa-sso

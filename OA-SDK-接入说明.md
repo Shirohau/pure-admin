@@ -50,7 +50,7 @@ docker build -f ops/django/DockerfileBuild -t swr.cn-southwest-2.myhuaweicloud.c
 docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build
 ```
 
-额外 Compose 文件只给 Django 与 Celery 传入免登变量，未修改原端口、数据库、Redis、证书和业务服务配置。原项目本身所需的 `.env`、本地配置模块、数据库初始化、证书和外部网络仍按其原部署方式准备。
+额外 Compose 文件给 Django 与 Celery 传入免登变量，同时为 Nginx 挂载免登所需的代理配置。原端口、Web 配置目录、数据库、Redis、证书和业务服务配置继续沿用主 Compose。原项目本身所需的 `.env`、本地配置模块、数据库初始化、证书和外部网络仍按其原部署方式准备。
 
 本次自动建号复用已有用户表、第三方身份表及其唯一约束，没有修改数据库结构。更新本次后台源码后，需要重建 Django/Celery 镜像使新逻辑生效；仅重启旧容器不能更新镜像中的代码。在外接应用项目根目录执行：
 
@@ -77,13 +77,21 @@ docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build 
 
 上游负责 `oa-sdktest.rekeymed.com` 的 HTTPS 入口仍需覆盖设置 `proxy_set_header X-Forwarded-Proto $scheme;`，不能原样透传浏览器提供的值。内层 Nginx 到 Django 使用 `$oa_forwarded_proto`。同时保留原始 `Host` 和浏览器 `Origin`。
 
-Compose 已增加 `./ops/nginx/oa-proxy:/etc/nginx/oa-proxy:ro` 挂载；服务器如使用自定义 Compose，也需在 Nginx 服务增加该挂载。首次应用此修复必须重新创建 Nginx 容器，单独 reload 不会添加挂载。同步代码并保留服务器自己的域名、证书及原有配置后，在项目根目录执行（有其他部署覆盖文件时一并沿用）：
+`docker-compose.oa-sso.yml` 已包含 `./ops/nginx/oa-proxy:/etc/nginx/oa-proxy:ro` 挂载；服务器可继续使用自己定制的主 Compose，只需叠加此文件，无需手动向主文件补挂载。主 Compose 已有相同挂载时，Compose 按容器挂载目标合并。首次应用此修复必须重新创建 Nginx 容器，单独 reload 不会添加挂载。同步代码并保留服务器自己的域名、证书及原有配置后，在项目根目录执行（有其他部署覆盖文件时一并沿用）：
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --build --no-deps --force-recreate nginx django celery
 ```
 
 此项改动不改变数据库结构，也无需重新构建前端静态资源。
+
+如果后台代码已经更新，此次只是补齐 Nginx 挂载（如服务器将 `23767:80` 映射到 `conf.http`），更新额外 Compose 文件后只需重新创建 Nginx，不需要构建镜像或重启其他服务：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.oa-sso.yml up -d --no-deps --force-recreate nginx
+```
+
+若出现 `open() "/etc/nginx/oa-proxy/forwarded-proto.conf" failed`，说明配置挂载未生效或宿主机缺少对应文件；不是身份校验失败。确认源码中的 `ops/nginx/oa-proxy` 已同步，并使用包含该挂载的额外 Compose 文件重新创建容器。
 
 应用首页请求会携带一次性 `oa_ticket`。部署代理应对携带该参数的请求关闭访问日志，并设置 `Referrer-Policy: no-referrer`；认证接口不记录请求体和授权头。原 Nginx 日志配置未在本次接入中整体调整，需在实际测试来源对应的代理处落实。
 
