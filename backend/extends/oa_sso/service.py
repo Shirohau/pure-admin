@@ -116,6 +116,59 @@ def read(kind, identifier, consume=False):
     return unseal(raw) if raw else None
 
 
+def platform_failure(response, path, *, authenticated=False):
+    """只展示协议错误编号，不透传可能含凭据或代理页面内容的原始响应。"""
+    stage = {
+        '/sso/v1/desktop/auth-requests/': '准备登录',
+        '/o/token/': '兑换登录码',
+        '/o/jwks/': '读取身份验签公钥',
+        '/sso/v1/tenant-context/': '确认员工与企业身份',
+        '/o/revoke/': '撤销应用授权',
+    }.get(path, '调用认证服务')
+    try:
+        payload = response.json()
+    except ValueError:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    reason = payload.get('reason_code') or payload.get('error')
+    if not isinstance(reason, str) or not re.fullmatch(r'[a-z][a-z0-9_]{0,79}', reason):
+        reason = 'unknown_error'
+    request_id = payload.get('request_id')
+    if not isinstance(request_id, str) or not re.fullmatch(r'[0-9a-f]{24}', request_id):
+        request_id = None
+    hints = {
+        'https_required': 'ECP 后台未识别到 HTTPS，请检查 ECP 平台的代理转发配置',
+        'client_authentication_required': 'ECP 未收到客户端认证信息，请检查平台代理是否保留 Authorization',
+        'client_authentication_invalid': 'Client ID 或 Client Secret 不匹配，请核对当前 ECP 平台为此应用签发的凭据',
+        'invalid_client': '客户端认证失败，请核对应用凭据',
+        'client_credential_inactive': '应用凭据已过期或被撤销，请更新凭据',
+        'redirect_uri_invalid': 'OA_REDIRECT_URI 与 ECP 登记的完整回调地址不一致',
+        'enterprise_redirect_uri_invalid': '回调地址不在企业批准的地址中',
+        'scope_not_allowed': '客户端未允许所需身份范围，请检查 openid、tenant；非测试模式还需 profile',
+        'application_not_published': '应用尚未发布或已暂停，请检查 ECP 应用发布状态',
+        'server_ip_not_allowed': '外接应用服务器的出口 IP 不在 ECP 应用的 IP 白名单中',
+        'protocol_disabled': 'ECP 平台尚未开启外部认证',
+        'enterprise_registration_required': '企业尚未批准此应用接入',
+        'signing_key_missing': 'ECP 平台未配置身份令牌签名私钥',
+        'signing_key_invalid': 'ECP 平台无法读取有效的身份令牌签名私钥',
+        'code_invalid': '登录码无效、已过期或已使用，请从工作台重新打开',
+        'code_binding_mismatch': '登录码对应的应用或回调地址不匹配',
+        'authentication_store_unavailable': 'ECP 认证数据服务暂不可用，请检查平台日志',
+    }
+    expired = authenticated and response.status_code in (401, 403)
+    hint = hints.get(reason, 'OA 授权已失效，请重新从工作台打开' if expired
+                     else '请根据错误编号检查 ECP 平台响应和应用配置')
+    if 300 <= response.status_code < 400:
+        hint = '认证接口发生跳转，请检查 OA_ISSUER 和 ECP 网关路由'
+    elif response.status_code == 404:
+        hint = 'ECP 认证接口不存在，请检查 OA_ISSUER 和 ECP 网关路由'
+    detail = f'HTTP {response.status_code}，{reason}'
+    if request_id:
+        detail += f'，平台请求编号 {request_id}'
+    return SsoError(f'OA {stage}失败：{hint}（{detail}）', 401 if expired else 502)
+
+
 def platform_request(path, *, data=None, json_body=None, access_token=None):
     cfg = config()
     headers = {}
@@ -131,9 +184,7 @@ def platform_request(path, *, data=None, json_body=None, access_token=None):
         verify=os.getenv('OA_CA_BUNDLE') or True,
     )
     if response.status_code != 200:
-        if response.status_code in (401, 403) and access_token:
-            raise SsoError('OA 授权已失效，请重新从工作台打开', 401)
-        raise SsoError('OA 平台拒绝请求，请检查应用登记、凭据或重新从工作台打开', 502)
+        raise platform_failure(response, path, authenticated=bool(access_token))
     if path == '/o/revoke/':
         return None
     payload = response.json()
