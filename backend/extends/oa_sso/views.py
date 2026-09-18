@@ -38,8 +38,10 @@ def endpoint(view):
             cfg = sso.config()
             if request.method != 'POST':
                 raise sso.SsoError('仅支持 POST 请求', 405)
-            if not request.is_secure() or request.headers.get('Origin') != cfg['OA_APP_ORIGIN']:
-                raise sso.SsoError('请从应用自己的 HTTPS 页面发起登录', 403)
+            if not request.is_secure():
+                raise sso.SsoError('应用后台未识别到 HTTPS，请联系管理员检查外接应用的代理转发配置', 403)
+            if request.headers.get('Origin') != cfg['OA_APP_ORIGIN']:
+                raise sso.SsoError('登录页面来源与 OA_APP_ORIGIN 不一致，请从配置的应用域名打开并检查代理是否保留 Origin', 403)
             if request.content_type != 'application/json' or len(request.body) > 16384:
                 raise sso.SsoError('请求格式无效')
             values = json.loads(request.body)

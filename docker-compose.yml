@@ -147,6 +147,7 @@ services:
 #      - ./ops/nginx/conf.d:/etc/nginx/conf.d # 挂载配置文件 用端口
 #      - ./ops/nginx/conf.http:/etc/nginx/conf.d # 挂载配置文件 用http（含移动端 UA 分流配置）
       - ./ops/nginx/conf.https:/etc/nginx/conf.d # 挂载配置文件 用https（含移动端 UA 分流配置）
+      - ./ops/nginx/oa-proxy:/etc/nginx/oa-proxy:ro # 原始访问协议与可信上游代理
       - ./ops/nginx/ssl:/etc/nginx/ssl # 挂载 ssl 证书
       - ./ops/nginx/logs:/var/log/nginx  # 挂载日志目录
       - ./backend/media:/usr/share/nginx/html/media # 挂载 media
