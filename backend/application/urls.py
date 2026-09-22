@@ -30,6 +30,9 @@ def health_check(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health_check),  # ← 健康检查端点
+    # 默认 Nginx 去掉 /api 前缀；同时兼容保留前缀的上游代理。
+    path('oa-events/', include('extends.oa_events.urls')),
+    path('api/oa-events/', include('extends.oa_events.urls')),
 ]
 # 仅在 DEBUG=True 时提供媒体文件服务
 if settings.DEBUG:
