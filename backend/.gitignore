@@ -7,6 +7,7 @@ logs
 # 忽略所有 migrations 目录下的 .py 文件，但保留 __init__.py
 **/migrations/*.py
 !**/migrations/__init__.py
+!extends/oa_directory/migrations/*.py
 
 /.codeartsdoer/
 

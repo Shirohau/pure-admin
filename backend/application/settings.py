@@ -193,3 +193,4 @@ from extends.workflow.settings import *  # 审批
 # 注册应用
 from apps.system.settings import *  # 系统应用
 from apps.example.settings import *  # 示例应用
+from extends.oa_directory.settings import *  # ECP 通讯录导入与事件处理

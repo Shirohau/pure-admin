@@ -35,6 +35,7 @@ class DeptViewSet(CrudViewSet, ExportMixin, ImportMixin):
     retrieve_serializer_class = DeptRetrieveSerializer
     create_serializer_class = DeptCreateSerializer
     update_serializer_class = DeptUpdateSerializer
+
     filterset_class = DeptFilter
     export_resource_class = DeptExportResource
     import_resource_class = DeptImportResource
@@ -42,6 +43,12 @@ class DeptViewSet(CrudViewSet, ExportMixin, ImportMixin):
     #   - owner / owner__dept：负责人信息（含负责人所属部门名），供 DeptOwnerSerializer 使用
     #   - creator / updater / dept_belong：审计字段展示名，基类默认配置
     select_related = ["creator", "updater", "dept_belong", "owner", "owner__dept"]
+
+    def get_queryset(self):
+        from extends.oa_directory.store import organization_is_replaced
+        queryset = super().get_queryset()
+        # 旧节点保留业务历史引用；当前组织页默认只展示有效组织。
+        return queryset.filter(status=True) if organization_is_replaced() else queryset
 
     def retrieve(self, request, *args, **kwargs):
         """

@@ -1,0 +1,33 @@
+# 与现有 docker-compose.yml、docker-compose.oa-sso.yml 叠加，复用数据库、镜像和免登环境。
+services:
+  django:
+    environment:
+      OA_DIRECTORY_SYNC_ENABLED: "1"
+  ecp-directory-worker:
+    image: vdd-django
+    working_dir: /backend
+    env_file:
+      - .env.oa-sso
+    environment:
+      PYTHONUNBUFFERED: "1"
+      ENVIRONMENT: prod
+      TZ: Asia/Shanghai
+      DATABASE_HOST: mysql
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?请沿用现有数据库配置}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请沿用现有数据库配置}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?请沿用现有缓存配置}
+      PUBLIC_IP: ${PUBLIC_IP}
+      ADMIN_URL: ${ADMIN_URL}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?请沿用现有签名密钥}
+      OA_DIRECTORY_SYNC_ENABLED: "1"
+    command: [python, manage.py, process_oa_directory_events, --watch, --interval, "2"]
+    volumes:
+      - ./backend:/backend
+      - ./backend/logs:/var/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped

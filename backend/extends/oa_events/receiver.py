@@ -1,4 +1,4 @@
-"""接收加密回调，保存验收记录；不自动修改测试应用的用户或部门。"""
+"""验签解密后持久化事件并快速响应，由独立进程查询详情、更新组织架构。"""
 import base64
 import hashlib
 import hmac
@@ -14,11 +14,13 @@ from datetime import datetime, timezone
 
 from Crypto.Cipher import AES
 from django.core.exceptions import RequestDataTooBig
+from django.db import DatabaseError
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.debug import sensitive_post_parameters
 from django_redis import get_redis_connection
 from redis.exceptions import RedisError
+from extends.oa_directory.sync import DirectorySyncError
 
 logger = logging.getLogger(__name__)
 EVENTS = {
@@ -149,8 +151,16 @@ def callback(request):
     except (ValueError, TypeError, KeyError, IndexError, AttributeError, struct.error, RequestDataTooBig):
         return response({'error': '回调验签或解密失败，请检查密钥、AppID 和服务器时间'}, 403)
     try:
+        if os.getenv('OA_DIRECTORY_SYNC_ENABLED') == '1':
+            from extends.oa_directory.store import capture_event, remember_verified_connection
+            if payload.get('EventType') == 'check_url':
+                remember_verified_connection(payload)
+            else:
+                capture_event(payload)
         record(payload, cfg[0])
-    except RedisError:
+    except ValueError:
+        return response({'error': '事件来源或对象信息不匹配'}, 403)
+    except (RedisError, DatabaseError, DirectorySyncError):
         logger.warning('OA_EVENT storage_unavailable')
         return response({'error': '接收记录暂时无法保存，请重试'}, 503)
     return response(acknowledgement(*cfg))

@@ -247,17 +247,20 @@ def mapped_user(identity, *, create=False, profile_data=None):
         ) if isinstance(value, str) and value.strip()), 'ECP 员工 ' + uid[:8])[:40]
         try:
             with transaction.atomic():
-                user = get_user_model()(
-                    username='oa_' + secrets.token_hex(24), name=name,
-                    is_active=True, is_staff=False, is_superuser=False,
-                    email=None, mobile=None,
-                )
-                user.set_unusable_password()
-                user.save(force_insert=True)
+                from extends.oa_directory.store import login_directory_user
+                user = login_directory_user(identity)
+                if user is None:
+                    user = get_user_model()(
+                        username='oa_' + secrets.token_hex(24), name=name,
+                        is_active=True, is_staff=False, is_superuser=False,
+                        email=None, mobile=None,
+                    )
+                    user.set_unusable_password()
+                    user.save(force_insert=True)
                 # 表已有 (platform, uid) 唯一约束。并发重复创建失败时同时回滚新用户。
                 binding = UserOAuthModel.objects.create(
                     user=user, platform=OA_BINDING_PLATFORM, uid=uid,
-                    uname=name, uinfo={'identity': subject},
+                    uname=name, uinfo={'identity': subject, 'member_uid': identity.get('member_uid')},
                 )
         except IntegrityError:
             binding = query.first()
@@ -270,6 +273,15 @@ def mapped_user(identity, *, create=False, profile_data=None):
     user = get_user_model().objects.filter(pk=binding.user_id, is_active=True).first()
     if user is None:
         raise SsoError('关联的本应用账号不存在或已停用', 403)
+    if create and identity.get('member_uid'):
+        from extends.oa_directory.store import associate_login
+        with transaction.atomic():
+            # member_uid 只能取自已验证的 ECP 登录身份，不接受前端自行指定。
+            info = {**binding.uinfo, 'member_uid': identity['member_uid'], 'directory_pending': True}
+            UserOAuthModel.objects.filter(pk=binding.pk, uid=uid).update(uinfo=info)
+            if associate_login(identity, user):
+                UserOAuthModel.objects.filter(pk=binding.pk, uinfo=info).update(uinfo={**info, 'directory_pending': False})
+                user.refresh_from_db()
     return user
 
 
